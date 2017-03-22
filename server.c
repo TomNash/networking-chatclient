@@ -112,9 +112,9 @@ void *join_handler(struct global_table *rec) {
 	newsock = rec->sockid;
 
 	// receive follow up registration packets
-	for (int i=0; i < REQUEST_NO-1; i++) {
+	for (i=req_no; i < REQUEST_NO; i++) {
 		if(recv(newsock,&packet_reg,sizeof(packet_reg),0)<0) {
-			printf("Could not receive RG-2\n");
+			printf("Could not receive RG-%d\n", i+1);
 			exit(1);
 		}
 		req_no++;
