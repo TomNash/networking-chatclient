@@ -192,6 +192,7 @@ int main(int argc, char* argv[]) {
 			exit(1);
 		}
 		recv(new_s, &packet_recv, sizeof(packet_recv), 0);
+		// Registration packet
 		if (ntohs(packet_recv.type) == 121) {
 			printf("Received registration request RG-1 from %s on port %d\n",packet_recv.data, ntohs(client_addr.sin_port));
 			client_info.sockid = new_s;
@@ -201,10 +202,17 @@ int main(int argc, char* argv[]) {
 			pthread_join(threads[0],&exit_value);
 			printf("Done register\n");
 		}
-		if (ntohs(packet_recv.type) == 321) {
+		else if (ntohs(packet_recv.type) == 221) {
+			
+		}
+		// Leave packet
+		else if (ntohs(packet_recv.type) == 321) {
 			printf("Received leave\n");
 			pthread_create(&threads[1],NULL,leave_handler,&packet_recv);
                         pthread_join(threads[1],&exit_value);
+		}
+		else {
+			continue;
 		}
 	}
 	close(sock_comm);

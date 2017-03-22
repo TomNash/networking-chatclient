@@ -8,6 +8,7 @@
 #include<pthread.h>
 
 #define SERVER_PORT 6990
+#define REQUEST_NO 3
 #define MAX_LINE 100
 
 int main(int argc, char* argv[]) {
@@ -40,10 +41,10 @@ int main(int argc, char* argv[]) {
 	// if three inputs, parse accordingly
 	if (argc == 3) {
 		host = argv[1];
-		max_count = atoi(argv[2]);
+		group = argv[2];
 	}
 	else{
-		fprintf(stderr, "usage: client [server hostname] [request machine name]\n");
+		fprintf(stderr, "usage: client [server hostname] [chat group name]\n");
 		exit(1);
 	}
 
@@ -58,7 +59,6 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "unkown host: %s\n", host);
 		exit(1);
 	}
-
 
 	// active open
 	if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -78,51 +78,18 @@ int main(int argc, char* argv[]) {
 		close(s);
 		exit(1);
 	}
-
-	// send registration packet RG-1
-	printf("Requesting registration RG-1 of %s on server running on %s at port %d\n", clientname, packet_reg.data, ntohs(sin.sin_port));
-	if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
-		printf("RG-1 send failed\n");
-		exit(1);
-	}
-
-	// send registration packet RG-2
-	printf("Requesting registration RG-2 of %s on server running on %s at port %d\n", clientname, packet_reg.data, ntohs(sin.sin_port));
-	if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
-		printf("RG-2 send failed\n");
-		exit(1);
-	}
-
-	// send registration packet RG-3
-	printf("Requesting registration RG-3 of %s on server running on %s at port %d\n", clientname, packet_reg.data, ntohs(sin.sin_port));
-	if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
-		printf("\nRG-3 send failed\n");
-		exit(1);
+	// send registration packets
+	for (int i=0; i < REQUEST_NO; i++) {
+		if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
+			printf("RG-%d send failed\n", i+1);
+			exit(1);
+		}
 	}
 	// receive response ACK
 	recv(s, &packet_reg, sizeof(packet_reg), 0);
 	printf("%d\n", ntohs(packet_reg.type));
 	if(ntohs(packet_reg.type) == 221) {
 		printf("Received registration acknowledgement\nBeginning to receive multicast message:\n\n");
-	}
-	while (len = recv(s, &packet_data, sizeof(packet_data), 0)) {
-                printf("%s", packet_data.data);
-                fflush(stdout);
-		counter++;
-		if (counter == max_count) {
-			close(s);
-			break;
-		}
-        }
-	// active open
-	if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-		perror("tcpclient: socket");
-		exit(1);
-	}
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-		perror("tcpclient: connect");
-		close(s);
-		exit(1);
 	}
 	packet_reg.type = htons(321);
         if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
