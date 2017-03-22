@@ -11,6 +11,7 @@
 #define SERVER_PORT 6990
 #define MAX_LINE 100
 #define MAX_PENDING 5
+#define REQUEST_NO 3
 
 pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -110,23 +111,14 @@ void *join_handler(struct global_table *rec) {
 	struct reg_packet packet_reg;
 	newsock = rec->sockid;
 
-	// receive RG-2
-	if(recv(newsock,&packet_reg,sizeof(packet_reg),0)<0) {
-		printf("Could not receive RG-2\n");
-		exit(1);
-	} else {
-		printf("Received RG-2\n");
+	// receive follow up registration packets
+	for (int i=0; i < REQUEST_NO-1; i++) {
+		if(recv(newsock,&packet_reg,sizeof(packet_reg),0)<0) {
+			printf("Could not receive RG-2\n");
+			exit(1);
+		}
+		req_no++;
 	}
-	req_no++;
-
-	// receive RG-3
-        if(recv(newsock,&packet_reg,sizeof(packet_reg),0)<0) {
-                printf("Could not receive RG-3\n");
-                exit(1);
-	} else {
-		printf("Received RG-3\n");
-	}
-	req_no++;
 
 	// add to table
 	pthread_mutex_lock(&my_mutex);
