@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
 	}
 	// send registration packets
 	for (int i=0; i < REQUEST_NO; i++) {
+		sprintf(packet_reg.data, "test%d", i);
 		printf("RG-%d sent\n", i+1);
 		if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
 			printf("RG-%d send failed\n", i+1);
@@ -89,14 +90,12 @@ int main(int argc, char* argv[]) {
 	if(ntohs(packet_reg.type) == 221) {
 		printf("Successfully registered to chat group %s:\n\n", group);
 	}
-/*
-	FD_ZERO(&readfds);
-	FD_SET(s, &readfds);
-	FD_SET(0, &readfds);
-
 	packet_data.type = htons(221);
 
 	while (1) {
+		FD_ZERO(&readfds);
+		FD_SET(0, &readfds);
+		FD_SET(s, &readfds);
 		select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
 		if(FD_ISSET(s, &readfds)){
 			recv(s, &packet_data, sizeof(packet_data), 0);
@@ -113,14 +112,4 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
-
-	// some way to close and remove from table
-	packet_reg.type = htons(321);
-        if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
-		printf("\nLeave request send failed\n");
-		exit(1);
-	}
-	close(s);
-}
-*/
 }

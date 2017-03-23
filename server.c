@@ -11,6 +11,7 @@
 #define SERVER_PORT 6990
 #define MAX_LINE 100
 #define MAX_PENDING 5
+#define MAX_CLIENTS 20
 #define REQUEST_NO 3
 
 pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -18,7 +19,7 @@ pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct global_table{
 	int sockid;
 };
-struct global_table record[20];
+struct global_table record[MAX_CLIENTS];
 int counter = -1; // counter for table, used to know if empty
 
 struct packet{
@@ -35,8 +36,6 @@ void *multicaster() {
 	int file_chunk = 0;
 	int seq_no = 0;
 	int nread;
-
-	filename = "multicasterinput.txt";
 
 	// continuously send data
 	while (1) {
@@ -99,17 +98,16 @@ void *leave_handler(struct packet *rec) {
 
 void *join_handler(struct global_table *rec) {
 	int newsock;
-	int req_no = 1;
 	struct packet packet_reg;
 	newsock = rec->sockid;
 
-	// receive follow up registration packets
-	for (int i=req_no; i < REQUEST_NO; i++) {
-		if(recv(newsock, &packet_reg, sizeof(packet_reg), 0) < 0) {
+	for (int i=0; i < REQUEST_NO; i++) {
+		if (recv(newsock, &packet_reg, sizeof(packet_reg), 0) < 0) {
 			printf("Could not receive RG-%d\n", i+1);
 			exit(1);
+		} else {
+			printf("Registered received: %s\n",packet_reg.data);
 		}
-		req_no++;
 	}
 
 	// add to table
@@ -121,7 +119,7 @@ void *join_handler(struct global_table *rec) {
 	// send response acknowledging registration
 	packet_reg.type = htons(221);
 	sprintf(packet_reg.data, "%d", newsock);
-	if(send(newsock, &packet_reg, sizeof(packet_reg), 0) < 0) {
+	if(send(newsock, &packet_reg, sizeof(packet_reg), 0) < 1) {
 		printf("ACK send failed\n");
 		exit(1);
 	}
@@ -133,7 +131,6 @@ int main(int argc, char* argv[]) {
 	int sock_comm, new_s;
 	int req_no;
 	int len;
-	int fd;
 	int exit_value;
 	pthread_t threads[3];
 
@@ -144,10 +141,6 @@ int main(int argc, char* argv[]) {
 	struct in_addr **addr_list;
 	struct sockaddr_in sin;
 	struct sockaddr_in client_addr;
-
-	struct timeval tv;
-
-	fd_set readfds;
 
 	// passive open socket
 	if ((sock_comm = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -168,57 +161,66 @@ int main(int argc, char* argv[]) {
 	}
 	listen(sock_comm, MAX_PENDING);
 
-	FD_ZERO(&readfds);
-	FD_SET(sock_comm, &readfds);
-
-	tv.tv_sec = 10;
-	tv.tv_usec = 500000;
-
-	printf("sock_comm: %d\n", sock_comm);
-	printf("size: %d\n", FD_SETSIZE);
 	// start multicaster
-	pthread_create(&threads[2],NULL,multicaster,NULL);
+	pthread_create(&threads[2], NULL, multicaster, NULL);
 
-	int n = sock_comm+1;
+	int n = 0;
+	int max_sock;
+	int sd;
+	int client_socket[MAX_CLIENTS];
+	fd_set readfds;
 
-	printf("sock comm: %d\n", sock_comm);
+	for (int i=0; i < MAX_CLIENTS; i++) {
+		client_socket[i] = 0;
+	}
 
         while (1) {
-		int rv = select(n, &readfds, NULL, NULL, &tv);
-		if (rv) {
-			for (fd = 0; fd < n; fd++) {
-				if (FD_ISSET(fd, &readfds)) {
-					printf("Connection on %d\n", fd);
-					if (fd == sock_comm) {
-			        	        if ((new_s = accept(sock_comm, (struct sockaddr *)&client_addr, &len)) < 0) {
-							printf("%d\n", new_s);
-			                        	perror("tcpserver: accept");
-							exit(1);
-						}
-						printf("Accepted\n");
-						recv(new_s, &packet_recv, sizeof(packet_recv), 0);
-						FD_SET(new_s, &readfds);
-						printf("New connection: %d\n", new_s);
-						n++;
-						client_info.sockid = new_s;
-						pthread_create(&threads[0],NULL,join_handler,&client_info);
-						pthread_join(threads[0],&exit_value);
-					}
-					else if (fd) {
-						recv(fd, &packet_recv, sizeof(packet_recv), 0);
-						if (ntohs(packet_recv.type) == 221) {
-							printf("hello\n");
-							printf("%s\n", packet_recv.data);
-							fflush(stdout);
-						}
-						else if (ntohs(packet_recv.type) == 321) {
-							pthread_create(&threads[1],NULL,leave_handler,&packet_recv);
-				                        pthread_join(threads[1],&exit_value);
-						}
-					}
+		FD_ZERO(&readfds);
+		FD_SET(sock_comm, &readfds);
+		max_sock = sock_comm;
+		for (int i=0; i < MAX_CLIENTS; i++) {
+			sd = client_socket[i];
+			if (sd > 0)
+				FD_SET(sd, &readfds);
+			if (sd > max_sock)
+				max_sock = sd;
+		}
+		int activity = select(max_sock+1, &readfds, NULL, NULL, NULL);
+		if (activity < 0) {
+			printf("select error");
+		}
+		if (FD_ISSET(sock_comm, &readfds)) {
+	       	        if ((new_s = accept(sock_comm, (struct sockaddr *)&client_addr, &len)) < 0) {
+	                       	perror("tcpserver: accept");
+				exit(1);
+			}
+			n++;
+			printf("New socket: %d\n", new_s);
+			client_info.sockid = new_s;
+			pthread_create(&threads[0],NULL,join_handler,&client_info);
+			pthread_join(threads[0],&exit_value);
+			for (int i=0; i < MAX_CLIENTS; i++) {
+				if (client_socket[i] == 0) {
+					client_socket[i] = new_s;
+					printf("Added socket %d to position %d\n", new_s, i);
+					break;
+				}
+			}
+		}
+		for (int i=0; i < n; i++) {
+			sd = client_socket[i];
+			printf("Socket %d\n", sd);
+			if (FD_ISSET(sd, &readfds)) {
+				if (recv(sd, &packet_recv, sizeof(packet_recv), 0) < 0) {
+					close(i);
+					client_socket[i] = 0;
+					n--;
+				}
+				else {
+					printf("type: %d\n", ntohs(packet_recv.type));
+					printf("data: %s\n", packet_recv.data);
 				}
 			}
 		}
 	}
-	close(sock_comm);
 }
