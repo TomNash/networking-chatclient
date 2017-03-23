@@ -56,7 +56,6 @@ int main(int argc, char* argv[]) {
 	// get hostname of client and request, copy to packets
 	gethostname(clientname, sizeof clientname);
 	int groupid = atoi(group);
-	printf("Group: %d\n", groupid);
 	packet_reg.group = htons(groupid);
 	packet_reg.type = htons(121);
 
@@ -95,6 +94,15 @@ int main(int argc, char* argv[]) {
 	if(ntohs(packet_reg.type) == 221) {
 		printf("Successfully registered to chat group %d:\n\n", ntohs(packet_reg.group));
 	}
+	else if(ntohs(packet_reg.type) == 231) {
+		printf("Selected group is curently full\n");
+		exit(1);
+	}
+	else if(ntohs(packet_reg.type) == 231) {
+		printf("Cannot create new group, max count reached\n");
+		exit(1);
+	}
+
 	packet_data.type = htons(221);
 	packet_data.group = packet_reg.group;
 

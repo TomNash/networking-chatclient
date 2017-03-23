@@ -109,6 +109,8 @@ void *join_handler(int newsock) {
 		printf("Registration received on %d for group %d\n", newsock, group_id);
 	}
 
+	packet_reg.type = htons(221);
+
 	pthread_mutex_lock(&my_mutex);
 	if (group_index < 0) { // no groups initialized
 		group_index++;
@@ -117,26 +119,29 @@ void *join_handler(int newsock) {
 		group_list[group_index].count = 1;
 		group_list[group_index].clients[0] = newsock;
 	} else { // at least one group exists
-		while (i < group_index+1 && inserting) {
-			printf("Value of i: %d\n", i);
+		do {
 			if (group_list[i].groupid == group_id) { //found group
-				int client_counter = group_list[group_index].count;
+				int client_counter = group_list[i].count;
 				if (client_counter == 4) { // group full
-					printf("Group full\n");
-					inserting = 0;
+					printf("Group %d full\n", group_id);
+					packet_reg.type = htons(231);
+					inserting = -1;
 				}
 				else { // spot in group
-					printf("Adding to group list position %d\n", group_index);
-					group_list[group_index].clients[client_counter] = newsock;
-					group_list[group_index].count++;
+					printf("Adding to group list position %d\n", i);
+					group_list[i].clients[client_counter] = newsock;
+					group_list[i].count++;
 					inserting = 0;
 				}
 			}
 			i++;
-		}
-		if (inserting) { // couldn't find group
-			if (group_index == 5) {
+		} while (i < group_index && inserting);
+
+		if (inserting == 1) { // couldn't find group
+			if (group_index == 4) {
 				printf("Too many groups exist\n");
+				packet_reg.type = htons(241);
+				inserting = -1;
 			} else {
 				group_index++;
 				printf("Creating group at position %d\n", group_index);
@@ -149,13 +154,12 @@ void *join_handler(int newsock) {
 	pthread_mutex_unlock(&my_mutex);
 
 	// send response acknowledging registration
-	packet_reg.type = htons(221);
 	packet_reg.group = packet_reg.group;
 	if(send(newsock, &packet_reg, sizeof(packet_reg), 0) < 1) {
 		printf("ACK send failed\n");
 		exit(1);
 	}
-	pthread_exit(NULL);
+	pthread_exit(inserting);
 }
 
 int main(int argc, char* argv[]) {
@@ -229,11 +233,13 @@ int main(int argc, char* argv[]) {
 			printf("New socket: %d\n", new_s);
 			pthread_create(&threads[0],NULL,join_handler,new_s);
 			pthread_join(threads[0],&exit_value);
-			for (int i=0; i < MAX_CLIENTS; i++) {
-				if (client_socket[i] == 0) {
-					client_socket[i] = new_s;
-					n++;
-					break;
+			if (exit_value == 0) {
+				for (int i=0; i < MAX_CLIENTS; i++) {
+					if (client_socket[i] == 0) {
+						client_socket[i] = new_s;
+						n++;
+						break;
+					}
 				}
 			}
 		}
