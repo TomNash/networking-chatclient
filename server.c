@@ -125,7 +125,7 @@ void *join_handler(int newsock) {
 				if (client_counter == 4) { // group full
 					printf("Group %d full\n", group_id);
 					packet_reg.type = htons(231);
-					inserting = -1;
+					inserting = 0;
 				}
 				else { // spot in group
 					printf("Adding to group list position %d\n", i);
@@ -141,7 +141,6 @@ void *join_handler(int newsock) {
 			if (group_index == 4) {
 				printf("Too many groups exist\n");
 				packet_reg.type = htons(241);
-				inserting = -1;
 			} else {
 				group_index++;
 				printf("Creating group at position %d\n", group_index);

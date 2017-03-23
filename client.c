@@ -37,9 +37,6 @@ int main(int argc, char* argv[]) {
 
 	int s;
 	int new_s;
-	int len;
-	int max_count;
-	int counter = 0;
 
 	fd_set readfds;
 
@@ -98,7 +95,7 @@ int main(int argc, char* argv[]) {
 		printf("Selected group is curently full\n");
 		exit(1);
 	}
-	else if(ntohs(packet_reg.type) == 231) {
+	else if(ntohs(packet_reg.type) == 241) {
 		printf("Cannot create new group, max count reached\n");
 		exit(1);
 	}
