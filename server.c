@@ -12,25 +12,33 @@
 #define MAX_LINE 100
 #define MAX_PENDING 5
 #define MAX_CLIENTS 20
-#define REQUEST_NO 3
 
 pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct global_table{
-	int sockid;
+struct group {
+	int groupid;
+	int clients[4];
+	int count;
 };
-struct global_table record[MAX_CLIENTS];
-int counter = -1; // counter for table, used to know if empty
+struct group group_list[5];
 
-struct packet{
-	short type;
+int group_index = -1; // counter for table, used to know if empty
+
+struct reg_packet {
+	int type;
+	int group;
+};
+
+struct data_packet {
+	int type;
+	int group;
 	char data[MAX_LINE];
 };
 
 void *multicaster() {
 	char *filename;
 	char text[100];
-	struct packet filedata;
+	struct data_packet filedata;
 	int fd;
 	int send_sock;
 	int file_chunk = 0;
@@ -39,44 +47,15 @@ void *multicaster() {
 
 	// continuously send data
 	while (1) {
-		sleep(3);
-		// if table not empty
-		if(counter >= 0) {
-			// open file, set nread to 1 since 0 bytes read means reached end of file
-			fd = open(filename,O_RDONLY,0);
-			file_chunk=0;
-			nread = 1;
-			// while there is more of the file to read
-			while (nread > 0) {
-				nread = read(fd, text, 100);
-				// close file if reached end
-				if(nread <= 0) {
-					close(fd);
-					break;
-				}
-				// copy those bytes read into the data packet
-				strncpy(filedata.data, text, nread);
-				// end string terminator
-				filedata.data[nread] = 0;
-				for (int j=0;j<=counter;j++) {
-					// get socket id from table and send
-					pthread_mutex_lock(&my_mutex);
-					send_sock = record[j].sockid;
-					pthread_mutex_unlock(&my_mutex);
-					if(send(send_sock,&filedata,sizeof(filedata),0) < 0){
-			                	printf("Data send failed\n");
-				        }
-				}
-			}
-		}
+		sleep(1);
 	}
 }
-
-void *leave_handler(struct packet *rec) {
+/*
+void *leave_handler(struct reg_packet *rec) {
 	int newsock;
 	int position;
 	int send_sock;
-	int find_sock = atoi(rec->data);
+	int find_sock = atoi(rec->);
 
 	printf("Leaving\n");
 	for (int j=0;j<=counter;j++) {
@@ -96,29 +75,82 @@ void *leave_handler(struct packet *rec) {
 	pthread_exit(NULL);
 }
 
-void *join_handler(struct global_table *rec) {
-	int newsock;
-	struct packet packet_reg;
-	newsock = rec->sockid;
+void *send_handler(struct data_packet) {
 
-	for (int i=0; i < REQUEST_NO; i++) {
-		if (recv(newsock, &packet_reg, sizeof(packet_reg), 0) < 0) {
-			printf("Could not receive RG-%d\n", i+1);
-			exit(1);
-		} else {
-			printf("Registered received: %s\n",packet_reg.data);
+	for (int j=0;j<=counter;j++) {
+		pthread_mutex_lock(&my_mutex);
+		send_sock = record[j].sockid;
+		pthread_mutex_unlock(&my_mutex);
+		if (send_sock == new_s) {
+			position = j;
 		}
 	}
+	for (int c=position; c < counter-1; c++) {
+		pthread_mutex_lock(&my_mutex);
+		record[c] = record[c+1];
+		pthread_mutex_unlock(&my_mutex);
+	}
+	pthread_exit(NULL);
 
-	// add to table
+}
+*/
+
+void *join_handler(int newsock) {
+	struct reg_packet packet_reg;
+	int group_id;
+	int i = 0;
+	int inserting = 1;
+
+	if (recv(newsock, &packet_reg, sizeof(packet_reg), 0) < 0) {
+		printf("Could not receive RG-%d\n", i+1);
+		exit(1);
+	} else {
+		group_id = ntohs(packet_reg.group);
+		printf("Registration received on %d for group %d\n", newsock, group_id);
+	}
+
 	pthread_mutex_lock(&my_mutex);
-	counter++;
-	record[counter].sockid = newsock;
+	if (group_index < 0) { // no groups initialized
+		group_index++;
+		printf("Creating new group at position %d\n", group_index);
+		group_list[group_index].groupid = group_id;
+		group_list[group_index].count = 1;
+		group_list[group_index].clients[0] = newsock;
+	} else { // at least one group exists
+		while (i < group_index+1 && inserting) {
+			printf("Value of i: %d\n", i);
+			if (group_list[i].groupid == group_id) { //found group
+				int client_counter = group_list[group_index].count;
+				if (client_counter == 4) { // group full
+					printf("Group full\n");
+					inserting = 0;
+				}
+				else { // spot in group
+					printf("Adding to group list position %d\n", group_index);
+					group_list[group_index].clients[client_counter] = newsock;
+					group_list[group_index].count++;
+					inserting = 0;
+				}
+			}
+			i++;
+		}
+		if (inserting) { // couldn't find group
+			if (group_index == 5) {
+				printf("Too many groups exist\n");
+			} else {
+				group_index++;
+				printf("Creating group at position %d\n", group_index);
+				group_list[group_index].groupid = group_id;
+				group_list[group_index].count = 1;
+				group_list[group_index].clients[0] = newsock;
+			}
+		}
+	}
 	pthread_mutex_unlock(&my_mutex);
 
 	// send response acknowledging registration
 	packet_reg.type = htons(221);
-	sprintf(packet_reg.data, "%d", newsock);
+	packet_reg.group = packet_reg.group;
 	if(send(newsock, &packet_reg, sizeof(packet_reg), 0) < 1) {
 		printf("ACK send failed\n");
 		exit(1);
@@ -134,8 +166,8 @@ int main(int argc, char* argv[]) {
 	int exit_value;
 	pthread_t threads[3];
 
-	struct global_table client_info;
-	struct packet packet_recv;
+	struct reg_packet packet_reg;
+	struct data_packet packet_data;
 
 	struct hostent *he;
 	struct in_addr **addr_list;
@@ -194,15 +226,13 @@ int main(int argc, char* argv[]) {
 	                       	perror("tcpserver: accept");
 				exit(1);
 			}
-			n++;
 			printf("New socket: %d\n", new_s);
-			client_info.sockid = new_s;
-			pthread_create(&threads[0],NULL,join_handler,&client_info);
+			pthread_create(&threads[0],NULL,join_handler,new_s);
 			pthread_join(threads[0],&exit_value);
 			for (int i=0; i < MAX_CLIENTS; i++) {
 				if (client_socket[i] == 0) {
 					client_socket[i] = new_s;
-					printf("Added socket %d to position %d\n", new_s, i);
+					n++;
 					break;
 				}
 			}
@@ -211,14 +241,15 @@ int main(int argc, char* argv[]) {
 			sd = client_socket[i];
 			printf("Socket %d\n", sd);
 			if (FD_ISSET(sd, &readfds)) {
-				if (recv(sd, &packet_recv, sizeof(packet_recv), 0) < 0) {
-					close(i);
+				if (recv(sd, &packet_data, sizeof(packet_data), 0) < 0) {
+					close(sd);
 					client_socket[i] = 0;
 					n--;
 				}
 				else {
-					printf("type: %d\n", ntohs(packet_recv.type));
-					printf("data: %s\n", packet_recv.data);
+					printf("hello\n");
+//					pthread_create(&threads[1],NULL,send_handler,&packet_data);
+//					pthread_join(threads[1],&exit_value);
 				}
 			}
 		}

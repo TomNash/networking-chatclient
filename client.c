@@ -8,19 +8,26 @@
 #include<pthread.h>
 
 #define SERVER_PORT 6990
-#define REQUEST_NO 3
 #define MAX_LINE 100
 
 int main(int argc, char* argv[]) {
 
-	struct packet{
-		short type;
+	struct reg_packet{
+		int type;
+		int group;
+	};
+
+	struct data_packet{
+		int type;
+		int group;
 		char data[MAX_LINE];
 	};
 
-	struct packet packet_reg, packet_data;
+	struct reg_packet packet_reg;
+	struct data_packet packet_data;
 	struct hostent *host_info;
 	struct sockaddr_in sin;
+
 	char *host;
 	char *group;
 	char *request;
@@ -42,13 +49,15 @@ int main(int argc, char* argv[]) {
 		group = argv[2];
 	}
 	else{
-		fprintf(stderr, "usage: client [server hostname] [chat group name]\n");
+		fprintf(stderr, "usage: client [server hostname] [chat group number]\n");
 		exit(1);
 	}
 
 	// get hostname of client and request, copy to packets
 	gethostname(clientname, sizeof clientname);
-	strcpy(packet_reg.data, group);
+	int groupid = atoi(group);
+	printf("Group: %d\n", groupid);
+	packet_reg.group = htons(groupid);
 	packet_reg.type = htons(121);
 
 	// translate host name into peer's IP address
@@ -77,20 +86,17 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	// send registration packets
-	for (int i=0; i < REQUEST_NO; i++) {
-		sprintf(packet_reg.data, "test%d", i);
-		printf("RG-%d sent\n", i+1);
-		if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
-			printf("RG-%d send failed\n", i+1);
-			exit(1);
-		}
+	if (send(s, &packet_reg, sizeof(packet_reg),0) < 0) {
+		printf("Registration send failed\n");
+		exit(1);
 	}
 	// receive response ACK
 	recv(s, &packet_reg, sizeof(packet_reg), 0);
 	if(ntohs(packet_reg.type) == 221) {
-		printf("Successfully registered to chat group %s:\n\n", group);
+		printf("Successfully registered to chat group %d:\n\n", ntohs(packet_reg.group));
 	}
 	packet_data.type = htons(221);
+	packet_data.group = packet_reg.group;
 
 	while (1) {
 		FD_ZERO(&readfds);
@@ -104,7 +110,6 @@ int main(int argc, char* argv[]) {
 			fflush(stdout);
 		}
 		if(FD_ISSET(0, &readfds)) {
-			printf("hello\n");
 			fgets(kb_msg, MAX_LINE, stdin);
 			strcpy(packet_data.data, kb_msg);
 			if (send(s, &packet_data, sizeof(packet_data), 0) < 0) {
