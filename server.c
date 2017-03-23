@@ -118,6 +118,7 @@ void *join_handler(int newsock) {
 		group_list[group_index].groupid = group_id;
 		group_list[group_index].count = 1;
 		group_list[group_index].clients[0] = newsock;
+		inserting = 0;
 	} else { // at least one group exists
 		do {
 			if (group_list[i].groupid == group_id) { //found group
@@ -125,7 +126,7 @@ void *join_handler(int newsock) {
 				if (client_counter == 4) { // group full
 					printf("Group %d full\n", group_id);
 					packet_reg.type = htons(231);
-					inserting = 0;
+					inserting = -1;
 				}
 				else { // spot in group
 					printf("Adding to group list position %d\n", i);
@@ -141,12 +142,14 @@ void *join_handler(int newsock) {
 			if (group_index == 4) {
 				printf("Too many groups exist\n");
 				packet_reg.type = htons(241);
+				inserting = -1;
 			} else {
 				group_index++;
 				printf("Creating group at position %d\n", group_index);
 				group_list[group_index].groupid = group_id;
 				group_list[group_index].count = 1;
 				group_list[group_index].clients[0] = newsock;
+				inserting = 0;
 			}
 		}
 	}
@@ -240,6 +243,8 @@ int main(int argc, char* argv[]) {
 						break;
 					}
 				}
+			} else {
+				close(new_s);
 			}
 		}
 		for (int i=0; i < n; i++) {
