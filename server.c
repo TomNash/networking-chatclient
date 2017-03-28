@@ -65,7 +65,6 @@ void *multicaster() {
 		last=head;
 		if(head->next!=NULL){
 			head=&head->next;
-			free(last);
 			}
 		else{
 			head=NULL;
