@@ -59,8 +59,9 @@ void *multicaster() {
 	while (1) {
 		sleep(1);
 		while(head!=NULL){
-	//	send the data now
+	//	prints the data that is sto be sent
 		printf("%s",head->data.data);
+		printf("group id is %i, Client id is %i\n", ntohs(head->data.group), 0);
 		last=head;
 		if(head->next!=NULL){
 			head=&head->next;

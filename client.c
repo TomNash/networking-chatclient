@@ -120,6 +120,7 @@ int main(int argc, char* argv[]) {
 			if (send(s, &packet_data, sizeof(packet_data), 0) < 0) {
 				printf("\nMessage send failed");
 			}
+				printf("message sent\n");
 		}
 	}
 }
