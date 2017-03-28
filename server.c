@@ -15,6 +15,7 @@
 
 pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+pthread_mutex_t msg_lock = PTHREAD_MUTEX_INITIALIZER;
 struct group {
 	int groupid;
 	int clients[4];
@@ -35,6 +36,15 @@ struct data_packet {
 	char data[MAX_LINE];
 };
 
+struct buffer_list{
+	struct data_packet data;
+	struct buffer_list* next;
+};
+
+struct buffer_list* head = NULL;
+struct buffer_list* tail = NULL;
+struct buffer_list* last = NULL;
+
 void *multicaster() {
 	char *filename;
 	char text[100];
@@ -48,6 +58,19 @@ void *multicaster() {
 	// continuously send data
 	while (1) {
 		sleep(1);
+		while(head!=NULL){
+	//	send the data now
+		printf("%s",head->data.data);
+		last=head;
+		if(head->next!=NULL){
+			head=&head->next;
+			free(last);
+			}
+		else{
+			head=NULL;
+
+			}
+		}
 	}
 }
 /*
@@ -256,8 +279,23 @@ int main(int argc, char* argv[]) {
 					client_socket[i] = 0;
 					n--;
 				}
-				else {
+				else {	
+				
+					pthread_mutex_lock(&msg_lock);
+					if (head!=NULL){
+						head->next=malloc(sizeof(struct buffer_list));
+						memcpy(&head->next->data, &packet_data,sizeof(struct buffer_list));
+						pthread_mutex_unlock(&msg_lock);
+						}
+					else{	
+						head=malloc(sizeof(struct buffer_list));
+						memcpy(&head->data,&packet_data,sizeof(struct buffer_list));
+						pthread_mutex_unlock(&msg_lock);
+						}
+//					packet is received, add to the message buffer
+					
 					printf("hello\n");
+//					add a mutex to add to the buffer
 //					pthread_create(&threads[1],NULL,send_handler,&packet_data);
 //					pthread_join(threads[1],&exit_value);
 				}
