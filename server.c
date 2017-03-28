@@ -295,7 +295,7 @@ int main(int argc, char* argv[]) {
 						}
 //					packet is received, add to the message buffer
 					
-					printf("hello\n");
+
 //					add a mutex to add to the buffer
 //					pthread_create(&threads[1],NULL,send_handler,&packet_data);
 //					pthread_join(threads[1],&exit_value);
