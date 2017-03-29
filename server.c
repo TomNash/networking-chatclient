@@ -57,6 +57,7 @@ void *multicaster() {
 	int seq_no = 0;
 	int nread;
 	int client;
+	int group_id;
 
 	// continuously send data
 	while (1) {
@@ -65,11 +66,20 @@ void *multicaster() {
 	//	prints the data that is sto be sent
 		printf("%s",head->data.data);
 		client = ntohs(head->data.client_id);
-		printf("group id is %i, Client id is %i\n", ntohs(head->data.group), client);
-		last=head;
+		group_id=ntohs(head->data.group);
+		for(int i=0;i<=group_index;i++){
+			if(group_list[i].groupid==group_id){
+				for(int j=0;j<group_list[i].count;j++){			
+					if(group_list[i].clients[j]!=client){
+						send(group_list[i].clients[j], &head->data, sizeof(head->data), 0);
+						printf("message sent to %i\n",group_list[i].clients[j]);
+					}
+				}
+			}
+		}
 		if(head->next!=NULL){
 			next=&head->next;
-			free(head);
+//			free(head);
 			head=next;
 			}
 		else{
@@ -161,6 +171,7 @@ void *join_handler(int newsock) {
 					printf("Adding to group list position %d\n", i);
 					group_list[i].clients[client_counter] = newsock;
 					group_list[i].count++;
+					printf("group %i is at %i capacity\n",i, group_list[i].count); 
 					inserting = 0;
 				}
 			}

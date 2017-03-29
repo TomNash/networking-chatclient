@@ -115,14 +115,13 @@ int main(int argc, char* argv[]) {
 		if(FD_ISSET(s, &readfds)){
 			recv(s, &packet_data, sizeof(packet_data), 0);
 			strcpy(recv_msg, packet_data.data);
-			printf(recv_msg);
+			printf("%s",recv_msg);
 			fflush(stdout);
 		}
 		if(FD_ISSET(0, &readfds)) {
 			fgets(kb_msg, MAX_LINE, stdin);
 			strcpy(packet_data.data, kb_msg);
 			packet_data.client_id = htons(client_id);
-			printf("client id = %i\n",client_id);
 			if (send(s, &packet_data, sizeof(packet_data), 0) < 0) {
 				printf("\nMessage send failed");
 			}
