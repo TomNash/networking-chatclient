@@ -22,6 +22,7 @@ int main(int argc, char* argv[]) {
 		int type;
 		int group;
 		int client_id;
+		char username[MAX_LINE];
 		char data[MAX_LINE];
 	};
 
@@ -35,6 +36,7 @@ int main(int argc, char* argv[]) {
 	char *request;
 	char clientname[128];
 	char kb_msg[MAX_LINE];
+	char username[MAX_LINE];
 	char recv_msg[MAX_LINE];
 
 	int s;
@@ -52,6 +54,10 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "usage: client [server hostname] [chat group number]\n");
 		exit(1);
 	}
+
+	printf("Enter your name: ");
+	fgets(username, sizeof(username), stdin);
+	username[strlen(username)-1] = '\0';
 
 	// get hostname of client and request, copy to packets
 	gethostname(clientname, sizeof clientname);
@@ -104,9 +110,6 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	packet_data.type = htons(221);
-	packet_data.group = packet_reg.group;
-		
 	while (1) {
 		FD_ZERO(&readfds);
 		FD_SET(0, &readfds);
@@ -114,18 +117,19 @@ int main(int argc, char* argv[]) {
 		select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
 		if(FD_ISSET(s, &readfds)){
 			recv(s, &packet_data, sizeof(packet_data), 0);
-			strcpy(recv_msg, packet_data.data);
-			printf("%s",recv_msg);
+			printf("%s: %s",packet_data.username, packet_data.data);
 			fflush(stdout);
 		}
 		if(FD_ISSET(0, &readfds)) {
 			fgets(kb_msg, MAX_LINE, stdin);
 			strcpy(packet_data.data, kb_msg);
+			strcpy(packet_data.username, username);
 			packet_data.client_id = htons(client_id);
+			packet_data.type = htons(221);
+			packet_data.group = packet_reg.group;
 			if (send(s, &packet_data, sizeof(packet_data), 0) < 0) {
 				printf("\nMessage send failed");
 			}
-				printf("message sent\n");
 		}
 	}
 }

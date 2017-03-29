@@ -35,6 +35,7 @@ struct data_packet {
 	int type;
 	int group;
 	int client_id;
+	char username[MAX_LINE];
 	char data[MAX_LINE];
 };
 
@@ -62,77 +63,28 @@ void *multicaster() {
 	// continuously send data
 	while (1) {
 		sleep(1);
-		while(head!=NULL){
-	//	prints the data that is sto be sent
-		printf("%s",head->data.data);
-		client = ntohs(head->data.client_id);
-		group_id=ntohs(head->data.group);
-		for(int i=0;i<=group_index;i++){
-			if(group_list[i].groupid==group_id){
-				for(int j=0;j<group_list[i].count;j++){			
-					if(group_list[i].clients[j]!=client){
-						send(group_list[i].clients[j], &head->data, sizeof(head->data), 0);
-						printf("message sent to %i\n",group_list[i].clients[j]);
+		while (head != NULL){
+			client = ntohs(head->data.client_id);
+			group_id = ntohs(head->data.group);
+			for (int i = 0; i <= group_index; i++) {
+				if (group_list[i].groupid==group_id) {
+					printf("Message from %s sent to group %i\n", &head->data.username, group_id);
+					for (int j = 0; j < group_list[i].count; j++) {
+						if (group_list[i].clients[j]!=client) {
+							send(group_list[i].clients[j], &head->data, sizeof(head->data), 0);
+						}
 					}
 				}
 			}
-		}
-		if(head->next!=NULL){
-			next=&head->next;
-//			free(head);
-			head=next;
-			}
-		else{
-			head=NULL;
-
+			if(head->next != NULL){
+				next = &head->next;
+				head = next;
+			} else{
+				head = NULL;
 			}
 		}
 	}
 }
-/*
-void *leave_handler(struct reg_packet *rec) {
-	int newsock;
-	int position;
-	int send_sock;
-	int find_sock = atoi(rec->);
-
-	printf("Leaving\n");
-	for (int j=0;j<=counter;j++) {
-		pthread_mutex_lock(&my_mutex);
-		send_sock = record[j].sockid;
-		pthread_mutex_unlock(&my_mutex);
-		if (send_sock == find_sock) {
-			position = j;
-		}
-	}
-	for (int c=position; c < counter-1; c++) {
-		pthread_mutex_lock(&my_mutex);
-		record[c] = record[c+1];
-		pthread_mutex_unlock(&my_mutex);
-	}
-	counter--;
-	pthread_exit(NULL);
-}
-
-void *send_handler(struct data_packet) {
-
-	for (int j=0;j<=counter;j++) {
-		pthread_mutex_lock(&my_mutex);
-		send_sock = record[j].sockid;
-		pthread_mutex_unlock(&my_mutex);
-		if (send_sock == new_s) {
-			position = j;
-		}
-	}
-	for (int c=position; c < counter-1; c++) {
-		pthread_mutex_lock(&my_mutex);
-		record[c] = record[c+1];
-		pthread_mutex_unlock(&my_mutex);
-	}
-	pthread_exit(NULL);
-
-}
-*/
 
 void *join_handler(int newsock) {
 	struct reg_packet packet_reg;
@@ -153,7 +105,6 @@ void *join_handler(int newsock) {
 	pthread_mutex_lock(&my_mutex);
 	if (group_index < 0) { // no groups initialized
 		group_index++;
-		printf("Creating new group at position %d\n", group_index);
 		group_list[group_index].groupid = group_id;
 		group_list[group_index].count = 1;
 		group_list[group_index].clients[0] = newsock;
@@ -168,16 +119,14 @@ void *join_handler(int newsock) {
 					inserting = -1;
 				}
 				else { // spot in group
-					printf("Adding to group list position %d\n", i);
 					group_list[i].clients[client_counter] = newsock;
 					group_list[i].count++;
-					printf("group %i is at %i capacity\n",i, group_list[i].count); 
 					inserting = 0;
 				}
 			}
 			i++;
 		} while (i < group_index && inserting);
-		
+
 		if (inserting == 1) { // couldn't find group
 			if (group_index == 4) {
 				printf("Too many groups exist\n");
@@ -185,7 +134,6 @@ void *join_handler(int newsock) {
 				inserting = -1;
 			} else {
 				group_index++;
-				printf("Creating group at position %d\n", group_index);
 				group_list[group_index].groupid = group_id;
 				group_list[group_index].count = 1;
 				group_list[group_index].clients[0] = newsock;
@@ -248,7 +196,7 @@ int main(int argc, char* argv[]) {
 	int client_socket[MAX_CLIENTS];
 	fd_set readfds;
 
-	for (int i=0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < MAX_CLIENTS; i++) {
 		client_socket[i] = 0;
 	}
 
@@ -256,27 +204,25 @@ int main(int argc, char* argv[]) {
 		FD_ZERO(&readfds);
 		FD_SET(sock_comm, &readfds);
 		max_sock = sock_comm;
-		for (int i=0; i < MAX_CLIENTS; i++) {
+		for (int i = 0; i < MAX_CLIENTS; i++) {
 			sd = client_socket[i];
-			if (sd > 0)
+			if (sd > 0) {
 				FD_SET(sd, &readfds);
-			if (sd > max_sock)
+			}
+			if (sd > max_sock) {
 				max_sock = sd;
+			}
 		}
 		int activity = select(max_sock+1, &readfds, NULL, NULL, NULL);
-		if (activity < 0) {
-			printf("select error");
-		}
 		if (FD_ISSET(sock_comm, &readfds)) {
 	       	        if ((new_s = accept(sock_comm, (struct sockaddr *)&client_addr, &len)) < 0) {
 	                       	perror("tcpserver: accept");
 				exit(1);
 			}
-			printf("New socket: %d\n", new_s);
-			pthread_create(&threads[0],NULL,join_handler,new_s);
-			pthread_join(threads[0],&exit_value);
+			pthread_create(&threads[0], NULL, join_handler, new_s);
+			pthread_join(threads[0], &exit_value);
 			if (exit_value == 0) {
-				for (int i=0; i < MAX_CLIENTS; i++) {
+				for (int i = 0; i < MAX_CLIENTS; i++) {
 					if (client_socket[i] == 0) {
 						client_socket[i] = new_s;
 						n++;
@@ -287,34 +233,24 @@ int main(int argc, char* argv[]) {
 				close(new_s);
 			}
 		}
-		for (int i=0; i < n; i++) {
+		for (int i = 0; i < n; i++) {
 			sd = client_socket[i];
-			printf("Socket %d\n", sd);
 			if (FD_ISSET(sd, &readfds)) {
 				if (recv(sd, &packet_data, sizeof(packet_data), 0) < 0) {
 					close(sd);
 					client_socket[i] = 0;
 					n--;
-				}
-				else {	
-				
+				} else {
 					pthread_mutex_lock(&msg_lock);
-					if (head!=NULL){
+					if (head != NULL){
 						head->next=malloc(sizeof(struct buffer_list));
-						memcpy(&head->next->data, &packet_data,sizeof(packet_data));
+						memcpy(&head->next->data, &packet_data, sizeof(packet_data));
 						pthread_mutex_unlock(&msg_lock);
-						}
-					else{	
-						head=malloc(sizeof(struct buffer_list));
-						memcpy(&head->data,&packet_data,sizeof(packet_data));
+					} else{
+						head = malloc(sizeof(struct buffer_list));
+						memcpy(&head->data,&packet_data, sizeof(packet_data));
 						pthread_mutex_unlock(&msg_lock);
-						}
-//					packet is received, add to the message buffer
-					
-
-//					add a mutex to add to the buffer
-//					pthread_create(&threads[1],NULL,send_handler,&packet_data);
-//					pthread_join(threads[1],&exit_value);
+					}
 				}
 			}
 		}
