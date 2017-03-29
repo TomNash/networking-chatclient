@@ -28,11 +28,13 @@ int group_index = -1; // counter for table, used to know if empty
 struct reg_packet {
 	int type;
 	int group;
+	int client_id;
 };
 
 struct data_packet {
 	int type;
 	int group;
+	int client_id;
 	char data[MAX_LINE];
 };
 
@@ -54,6 +56,7 @@ void *multicaster() {
 	int file_chunk = 0;
 	int seq_no = 0;
 	int nread;
+	int client;
 
 	// continuously send data
 	while (1) {
@@ -61,7 +64,8 @@ void *multicaster() {
 		while(head!=NULL){
 	//	prints the data that is sto be sent
 		printf("%s",head->data.data);
-		printf("group id is %i, Client id is %i\n", ntohs(head->data.group), 0);
+		client = ntohs(head->data.client_id);
+		printf("group id is %i, Client id is %i\n", ntohs(head->data.group), client);
 		last=head;
 		if(head->next!=NULL){
 			next=&head->next;
@@ -162,7 +166,7 @@ void *join_handler(int newsock) {
 			}
 			i++;
 		} while (i < group_index && inserting);
-
+		
 		if (inserting == 1) { // couldn't find group
 			if (group_index == 4) {
 				printf("Too many groups exist\n");
@@ -181,7 +185,7 @@ void *join_handler(int newsock) {
 	pthread_mutex_unlock(&my_mutex);
 
 	// send response acknowledging registration
-	packet_reg.group = packet_reg.group;
+	packet_reg.client_id=htons(newsock);
 	if(send(newsock, &packet_reg, sizeof(packet_reg), 0) < 1) {
 		printf("ACK send failed\n");
 		exit(1);

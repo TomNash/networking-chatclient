@@ -15,11 +15,13 @@ int main(int argc, char* argv[]) {
 	struct reg_packet{
 		int type;
 		int group;
+		int client_id;
 	};
 
 	struct data_packet{
 		int type;
 		int group;
+		int client_id;
 		char data[MAX_LINE];
 	};
 
@@ -37,6 +39,7 @@ int main(int argc, char* argv[]) {
 
 	int s;
 	int new_s;
+	int client_id;
 
 	fd_set readfds;
 
@@ -90,6 +93,7 @@ int main(int argc, char* argv[]) {
 	recv(s, &packet_reg, sizeof(packet_reg), 0);
 	if(ntohs(packet_reg.type) == 221) {
 		printf("Successfully registered to chat group %d:\n\n", ntohs(packet_reg.group));
+		client_id = ntohs(packet_reg.client_id);
 	}
 	else if(ntohs(packet_reg.type) == 231) {
 		printf("Selected group is curently full\n");
@@ -102,7 +106,7 @@ int main(int argc, char* argv[]) {
 
 	packet_data.type = htons(221);
 	packet_data.group = packet_reg.group;
-
+		
 	while (1) {
 		FD_ZERO(&readfds);
 		FD_SET(0, &readfds);
@@ -117,6 +121,8 @@ int main(int argc, char* argv[]) {
 		if(FD_ISSET(0, &readfds)) {
 			fgets(kb_msg, MAX_LINE, stdin);
 			strcpy(packet_data.data, kb_msg);
+			packet_data.client_id = htons(client_id);
+			printf("client id = %i\n",client_id);
 			if (send(s, &packet_data, sizeof(packet_data), 0) < 0) {
 				printf("\nMessage send failed");
 			}
