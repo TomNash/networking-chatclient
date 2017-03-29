@@ -42,7 +42,7 @@ struct buffer_list{
 };
 
 struct buffer_list* head = NULL;
-struct buffer_list* tail = NULL;
+struct buffer_list* next = NULL;
 struct buffer_list* last = NULL;
 
 void *multicaster() {
@@ -64,7 +64,9 @@ void *multicaster() {
 		printf("group id is %i, Client id is %i\n", ntohs(head->data.group), 0);
 		last=head;
 		if(head->next!=NULL){
-			head=&head->next;
+			next=&head->next;
+			free(head);
+			head=next;
 			}
 		else{
 			head=NULL;
@@ -284,12 +286,12 @@ int main(int argc, char* argv[]) {
 					pthread_mutex_lock(&msg_lock);
 					if (head!=NULL){
 						head->next=malloc(sizeof(struct buffer_list));
-						memcpy(&head->next->data, &packet_data,sizeof(struct buffer_list));
+						memcpy(&head->next->data, &packet_data,sizeof(packet_data));
 						pthread_mutex_unlock(&msg_lock);
 						}
 					else{	
 						head=malloc(sizeof(struct buffer_list));
-						memcpy(&head->data,&packet_data,sizeof(struct buffer_list));
+						memcpy(&head->data,&packet_data,sizeof(packet_data));
 						pthread_mutex_unlock(&msg_lock);
 						}
 //					packet is received, add to the message buffer
