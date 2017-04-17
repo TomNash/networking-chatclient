@@ -12,12 +12,14 @@
 
 int main(int argc, char* argv[]) {
 
+	// Registration packet
 	struct reg_packet{
 		int type;
 		int group;
 		int client_id;
 	};
 
+	// Data packet
 	struct data_packet{
 		int type;
 		int group;
@@ -55,6 +57,7 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	// Get username
 	printf("Enter your name: ");
 	fgets(username, sizeof(username), stdin);
 	username[strlen(username)-1] = '\0';
@@ -111,15 +114,19 @@ int main(int argc, char* argv[]) {
 	}
 
 	while (1) {
+		// Initialize file descriptor set
 		FD_ZERO(&readfds);
 		FD_SET(0, &readfds);
 		FD_SET(s, &readfds);
+		// Check which ones changed
 		select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
+		// If packet received, print
 		if(FD_ISSET(s, &readfds)){
 			recv(s, &packet_data, sizeof(packet_data), 0);
 			printf("%s: %s",packet_data.username, packet_data.data);
 			fflush(stdout);
 		}
+		// If user sent a message
 		if(FD_ISSET(0, &readfds)) {
 			fgets(kb_msg, MAX_LINE, stdin);
 			strcpy(packet_data.data, kb_msg);

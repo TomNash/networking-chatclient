@@ -14,23 +14,27 @@
 #define MAX_CLIENTS 20
 
 pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 pthread_mutex_t msg_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Group struct
 struct group {
 	int groupid;
 	int clients[4];
 	int count;
 };
+// Support 5 groups
 struct group group_list[5];
 
 int group_index = -1; // counter for table, used to know if empty
 
+// Registration packet
 struct reg_packet {
 	int type;
 	int group;
 	int client_id;
 };
 
+// Data packet
 struct data_packet {
 	int type;
 	int group;
@@ -39,11 +43,11 @@ struct data_packet {
 	char data[MAX_LINE];
 };
 
+// Set up linked list
 struct buffer_list{
 	struct data_packet data;
 	struct buffer_list* next;
 };
-
 struct buffer_list* head = NULL;
 struct buffer_list* next = NULL;
 struct buffer_list* last = NULL;
@@ -63,9 +67,13 @@ void *multicaster() {
 	// continuously send data
 	while (1) {
 		sleep(1);
+		// Check if message to send
 		while (head != NULL){
+			// Get the client who sent the message
 			client = ntohs(head->data.client_id);
+			// Get client's group
 			group_id = ntohs(head->data.group);
+			// For every client in the group, minus the sender, send the message
 			for (int i = 0; i <= group_index; i++) {
 				if (group_list[i].groupid==group_id) {
 					printf("Message from %s sent to group %i\n", &head->data.username, group_id);
@@ -76,6 +84,7 @@ void *multicaster() {
 					}
 				}
 			}
+			// Change link on the list
 			if(head->next != NULL){
 				next = &head->next;
 				head = next;
@@ -101,8 +110,8 @@ void *join_handler(int newsock) {
 	}
 
 	packet_reg.type = htons(221);
-
 	pthread_mutex_lock(&my_mutex);
+
 	if (group_index < 0) { // no groups initialized
 		group_index++;
 		group_list[group_index].groupid = group_id;
@@ -201,8 +210,10 @@ int main(int argc, char* argv[]) {
 	}
 
         while (1) {
+		// initialize file descriptors
 		FD_ZERO(&readfds);
 		FD_SET(sock_comm, &readfds);
+		// find max socket of all connections
 		max_sock = sock_comm;
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			sd = client_socket[i];
@@ -213,6 +224,7 @@ int main(int argc, char* argv[]) {
 				max_sock = sd;
 			}
 		}
+		// check activity on all sockets
 		int activity = select(max_sock+1, &readfds, NULL, NULL, NULL);
 		if (FD_ISSET(sock_comm, &readfds)) {
 	       	        if ((new_s = accept(sock_comm, (struct sockaddr *)&client_addr, &len)) < 0) {
@@ -233,6 +245,7 @@ int main(int argc, char* argv[]) {
 				close(new_s);
 			}
 		}
+		// check for messages from clients
 		for (int i = 0; i < n; i++) {
 			sd = client_socket[i];
 			if (FD_ISSET(sd, &readfds)) {
